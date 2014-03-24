@@ -107,12 +107,12 @@ function get_tty {
 }
 
 
-asktext='Hast Du das Paßwort?'
-askprompt='Code:'
+asktext='Secure Key Entry'
+askprompt='Input:'
 askerror=''
 askbool=0
-btnyes=
-btnno=
+btnyes='Enter'
+btnno='Cancel'
 
 while getopts 'bEe:hmN:p:qt:Y:' ch; do
 	case $ch {
