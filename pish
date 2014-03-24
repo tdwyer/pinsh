@@ -1,0 +1,221 @@
+#!/usr/bin/env mksh
+# $MirOS: contrib/hosted/tg/code/kwalletcli/kwalletcli_getpin,v 1.21 2011/05/10 09:05:17 tg Exp $
+#
+# PISH - A password sniffer you can trust
+# Thomas Dwyer <github@tomd.tel> http://tomd.tel
+# Basically all the same code as kwalletcli-getpin
+#
+# Except:
+#   - Dont save password to var
+#   - Dont silently fall back to insecure method of getting password
+#
+#-
+# Copyright © 2009, 2010, 2011
+#	Thorsten Glaser <t.glaser@tarent.de>
+#
+# Provided that these terms and disclaimer and all copyright notices
+# are retained or reproduced in an accompanying document, permission
+# is granted to deal in this work without restriction, including un‐
+# limited rights to use, publicly perform, distribute, sell, modify,
+# merge, give away, or sublicence.
+#
+# This work is provided “AS IS” and WITHOUT WARRANTY of any kind, to
+# the utmost extent permitted by applicable law, neither express nor
+# implied; without malicious intent or gross negligence. In no event
+# may a licensor, author or contributor be held liable for indirect,
+# direct, other damage, loss, or other issues arising in any way out
+# of dealing in the work, even if advised of the possibility of such
+# damage or existence of a defect, except proven that it results out
+# of said person’s immediate fault when using the work as intended.
+
+unset LC_ALL LANGUAGE LC_NUMERIC LC_TIME LC_COLLATE LC_MONETARY \
+    LC_PAPER LC_NAME LC_ADDRESS LC_TELEPHONE LC_MEASUREMENT LC_IDENTIFICATION
+[[ -z $LC_CTYPE ]] && LC_CTYPE=en_US.UTF-8
+export LANG=C LC_CTYPE LC_MESSAGES GPG_TERM GPG_TTY
+set -U
+
+quiet=0
+nl='
+'
+
+function die {
+	local rv=$1
+
+	shift
+	(( quiet )) || print -u2 -r -- "$@"
+	exit $rv
+}
+
+function checkline {
+	local res
+
+	print -pr -- "$@"
+	read -p res || die 3 pinentry died
+	[[ $res = OK@(| *) ]] || die 4 "got '$res' for '$*'"
+}
+
+function toutf8 {
+	local intext="$*" outtext=''
+	typeset -i i=0 n=${#intext}
+	typeset -i1 c
+	typeset -Uui16 -Z5 x
+
+	while (( i < n )); do
+		c=1#${intext:(i++):1}
+		if (( (c & 0xFF80) == 0xEF80 )); then
+			(( c &= 0xFF ))
+		fi
+		if (( c < 32 || c == 1#% || c == 1#_ )); then
+			let x=c
+			outtext=${outtext}%${x#16#}
+		elif (( c > 0x7E && c < 0xA0 )); then
+			outtext=${outtext}�
+		else
+			outtext=${outtext}${c#1#}
+		fi
+	done
+
+	print -nr -- "$outtext"
+}
+
+function tolat1 {
+	local intext="$*" outtext=''
+	typeset -i i=0 n=${#intext}
+	typeset -i1 c
+	typeset -Uui16 -Z5 x
+
+	while (( i < n )); do
+		c=1#${intext:(i++):1}
+		(( c = c < 0x80 ? c : (c & 0xFF80) == 0xEF80 ? c :
+		    c < 0x0100 ? c | 0xEF00 : 0xEFFF ))
+		outtext=${outtext}${c#1#}
+	done
+
+	print -nr -- "$outtext"
+}
+
+function usage {
+	print -u2 "Usage:\tkwalletcli_getpin [-q] [-b | -m | -p prompt]"
+	print -u2 "\t[-E | -e errortext] [-N NoBtn] [-t desctext] [-Y YesBtn]"
+	print -u2 "Returns: 0=ok (pw on stdout), 1=cancel, 2+=error"
+	exit 2
+}
+
+function get_tty {
+	GPG_TTY=$(tty) || GPG_TTY=
+	[[ -n $GPG_TTY ]] || die 5 Please set GPG_TTY yourself
+}
+
+
+asktext='Hast Du das Paßwort?'
+askprompt='Code:'
+askerror=''
+askbool=0
+btnyes=
+btnno=
+
+while getopts 'bEe:hmN:p:qt:Y:' ch; do
+	case $ch {
+	(b)	askbool=1 ;;
+	(E)	askerror='' ;;
+	(e)	askerror=$OPTARG ;;
+	(m)	askbool=2 ;;
+	(N)	btnno=$OPTARG ;;
+	(p)	askprompt=$OPTARG ;;
+	(q)	quiet=1 ;;
+	(t)	asktext=$OPTARG ;;
+	(Y)	btnyes=$OPTARG ;;
+	(*)	usage ;;
+	}
+done
+shift $((OPTIND - 1))
+(( $# )) && usage
+
+set -A pe_args
+if [[ -n $DISPLAY ]]; then
+	pe_args[${#pe_args[*]}]=--display
+	pe_args[${#pe_args[*]}]=$DISPLAY
+fi
+
+[[ -n $PINENTRY ]] || PINENTRY=pinentry
+if "${PINENTRY}" --version >/dev/null 2>&1; then
+	"${PINENTRY}" "${pe_args[@]}" |&
+	subpid=$?
+	read -p res || die 3 pinentry died
+	[[ $res = OK@(| *) ]] || die 4 "got '$res' for '$*'"
+	trap "kill $subpid; die 6 caught SIGHUP" 1
+	trap "kill $subpid; die 6 caught SIGINT" 2
+	trap "kill $subpid; die 6 caught SIGQUIT" 3
+	trap "kill $subpid; die 6 caught SIGTRAP" 5
+	trap "kill $subpid; die 6 caught SIGPIPE" 13
+	trap "kill $subpid; die 6 caught SIGTERM" 15
+else
+  # Just Die if you dont really have pinentry
+	die 7 You must install pinentry
+fi
+
+[[ -z $DISPLAY && -z $GPG_TTY ]] && get_tty
+[[ -z $GPG_TERM ]] && GPG_TERM=${TERM:-vt100}
+
+# No Im dead now
+# Dont ask for the password with a less secure method
+
+[[ -z $GPG_TTY ]] || checkline "OPTION ttyname=$GPG_TTY"
+[[ -z $GPG_TERM ]] || checkline "OPTION ttytype=$GPG_TERM"
+[[ -z $LC_CTYPE ]] || checkline "OPTION lc-ctype=$LC_CTYPE"
+[[ -z $LC_MESSAGES ]] || checkline "OPTION lc-messages=$LC_MESSAGES"
+
+[[ -n $asktext ]] && checkline "SETDESC $(toutf8 "$asktext")"
+[[ -n $askprompt ]] && checkline "SETPROMPT $(toutf8 "$askprompt")"
+[[ -n $askerror ]] && checkline "SETERROR $(toutf8 "$askerror")"
+
+[[ -n $btnyes ]] && checkline "SETOK $(toutf8 "$btnyes")"
+[[ -n $btnno ]] && checkline "SETCANCEL $(toutf8 "$btnno")"
+
+
+function askbool_interpret {
+  read -p res || die 3 pinentry died
+  if [[ $res = @(D )* ]]; then
+    pass=${res#D }
+    read -p res || die 3 pinentry died
+  else
+    pass=
+  fi
+  if [[ $res = OK@(| *) ]]; then
+    rv=0
+  else
+    rv=1
+  fi
+}
+
+# I do this
+# print to stdout dont save becase there is no reason at all to do so
+function gitpin_stdout {
+  read -p res || die 3 pinentry died
+  if [[ $res = @(D )* ]]; then
+    print -nr -- ${res#D }
+    read -p res || die 3 pinentry died
+  else
+    pass=
+  fi
+  if [[ $res = OK@(| *) ]]; then
+    rv=0
+  else
+    rv=1
+  fi
+}
+
+
+if (( askbool == 2 )); then
+	print -p MESSAGE
+  askbool_interpret
+elif (( askbool )); then
+	print -p CONFIRM
+  askbool_interpret
+else
+	print -p GETPIN
+  gitpin_stdout
+fi
+
+exec 3>&p; exec 3>&-
+exit $rv
