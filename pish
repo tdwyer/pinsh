@@ -1,11 +1,16 @@
-#!/usr/bin/env mksh
-# $MirOS: contrib/hosted/tg/code/kwalletcli/kwalletcli_getpin,v 1.21 2011/05/10 09:05:17 tg Exp $
+#!/usr/bin/env ksh
 #
 # PISH - A password sniffer you can trust
 # Thomas Dwyer <github@tomd.tel> http://tomd.tel
 # Basically all the same code as kwalletcli-getpin
 #
+# Tested on:
+#   OpenBSD 5.5 -stable
+#
 # Except:
+#   - Converted to OpenBSD ksh
+#   - Ripped out GUI message text UTF-8 conversion, removed: toutf8()
+#   - Ripped out unused function: tolat1()
 #   - Dont save password to var
 #   - Dont silently fall back to insecure method of getting password
 #
@@ -32,7 +37,6 @@ unset LC_ALL LANGUAGE LC_NUMERIC LC_TIME LC_COLLATE LC_MONETARY \
     LC_PAPER LC_NAME LC_ADDRESS LC_TELEPHONE LC_MEASUREMENT LC_IDENTIFICATION
 [[ -z $LC_CTYPE ]] && LC_CTYPE=en_US.UTF-8
 export LANG=C LC_CTYPE LC_MESSAGES GPG_TERM GPG_TTY
-set -U
 
 quiet=0
 nl='
@@ -54,46 +58,6 @@ function checkline {
 	[[ $res = OK@(| *) ]] || die 4 "got '$res' for '$*'"
 }
 
-function toutf8 {
-	local intext="$*" outtext=''
-	typeset -i i=0 n=${#intext}
-	typeset -i1 c
-	typeset -Uui16 -Z5 x
-
-	while (( i < n )); do
-		c=1#${intext:(i++):1}
-		if (( (c & 0xFF80) == 0xEF80 )); then
-			(( c &= 0xFF ))
-		fi
-		if (( c < 32 || c == 1#% || c == 1#_ )); then
-			let x=c
-			outtext=${outtext}%${x#16#}
-		elif (( c > 0x7E && c < 0xA0 )); then
-			outtext=${outtext}�
-		else
-			outtext=${outtext}${c#1#}
-		fi
-	done
-
-	print -nr -- "$outtext"
-}
-
-function tolat1 {
-	local intext="$*" outtext=''
-	typeset -i i=0 n=${#intext}
-	typeset -i1 c
-	typeset -Uui16 -Z5 x
-
-	while (( i < n )); do
-		c=1#${intext:(i++):1}
-		(( c = c < 0x80 ? c : (c & 0xFF80) == 0xEF80 ? c :
-		    c < 0x0100 ? c | 0xEF00 : 0xEFFF ))
-		outtext=${outtext}${c#1#}
-	done
-
-	print -nr -- "$outtext"
-}
-
 function usage {
 	print -u2 "Usage:\tkwalletcli_getpin [-q] [-b | -m | -p prompt]"
 	print -u2 "\t[-E | -e errortext] [-N NoBtn] [-t desctext] [-Y YesBtn]"
@@ -106,7 +70,8 @@ function get_tty {
 	[[ -n $GPG_TTY ]] || die 5 Please set GPG_TTY yourself
 }
 
-
+# The mksh version of this script converted these to UTF-8
+# That code has been ripped out, so make sure to only use US-ASCII
 asktext='Secure Key Entry'
 askprompt='Input:'
 askerror=''
@@ -165,12 +130,12 @@ fi
 [[ -z $LC_CTYPE ]] || checkline "OPTION lc-ctype=$LC_CTYPE"
 [[ -z $LC_MESSAGES ]] || checkline "OPTION lc-messages=$LC_MESSAGES"
 
-[[ -n $asktext ]] && checkline "SETDESC $(toutf8 "$asktext")"
-[[ -n $askprompt ]] && checkline "SETPROMPT $(toutf8 "$askprompt")"
-[[ -n $askerror ]] && checkline "SETERROR $(toutf8 "$askerror")"
+[[ -n $asktext ]] && checkline "SETDESC $asktext"
+[[ -n $askprompt ]] && checkline "SETPROMPT $askprompt"
+[[ -n $askerror ]] && checkline "SETERROR $askerror"
 
-[[ -n $btnyes ]] && checkline "SETOK $(toutf8 "$btnyes")"
-[[ -n $btnno ]] && checkline "SETCANCEL $(toutf8 "$btnno")"
+[[ -n $btnyes ]] && checkline "SETOK $btnyes"
+[[ -n $btnno ]] && checkline "SETCANCEL $btnno"
 
 
 function askbool_interpret {
