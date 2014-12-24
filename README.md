@@ -1,13 +1,15 @@
 pish
 ====
 
-Easy to use pinentry wrapper written in mksh. Basically, `pish` is an isolated copy of [kwalletcli-getpin](https://www.mirbsd.org/kwalletcli.htm "kwalletcli-getpin") with no KDE dependencies ,and some insecure code removed.
+Easy to use pinentry wrapper written in OpenBSD's ksh. Basically, `pish` is an isolated copy of [kwalletcli-getpin](https://www.mirbsd.org/kwalletcli.htm "kwalletcli-getpin") with no KDE dependencies, and some insecure code removed.
 
 
 ### Tested and Used on:
 
 
   - [OpenBSD 5.5 -stable](http://www.openbsd.org/ "OpenBSD 5.5 -stable")
+  - [OpenBSD 5.6 -stable](http://www.openbsd.org/ "OpenBSD 5.6 -stable")
+  - [OpenBSD 5.6 -current](http://www.openbsd.org/ "OpenBSD 5.6 -current")
 
 
 ### Changes Made to kwalletcli-gitpin
