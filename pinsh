@@ -50,7 +50,7 @@ function die {
 	local rv=$1
 
 	shift
-	(( quiet )) || print -u2 -r -- "$@"
+	if [[ $quiet -gt 0 ]] ;then print -u2 -r -- "$@" ;fi
 	exit $rv
 }
 
