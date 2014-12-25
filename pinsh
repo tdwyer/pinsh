@@ -1,4 +1,4 @@
-#!/usr/bin/env ksh
+#!/bin/sh
 #
 # PISH - A password sniffer you can trust
 # Thomas Dwyer <github@tomd.tel> http://tomd.tel
@@ -8,7 +8,7 @@
 #   OpenBSD 5.5 -stable
 #
 # Except:
-#   - Converted to OpenBSD ksh
+#   - Converted to /bin/sh
 #   - Ripped out GUI message text UTF-8 conversion, removed: toutf8()
 #   - Ripped out unused function: tolat1()
 #   - Dont save password to var
@@ -96,7 +96,7 @@ while getopts 'bEe:hmN:p:qt:Y:' ch; do
 	}
 done
 shift $((OPTIND - 1))
-(( $# )) && usage
+if [[ $# -gt 0 ]] ;then usage ;fi
 
 set -A pe_args
 if [[ -n $DISPLAY ]]; then
@@ -173,10 +173,10 @@ function gitpin_stdout {
 }
 
 
-if (( askbool == 2 )); then
+if [[ $askbool -eq 2 ]]; then
 	print -p MESSAGE
   askbool_interpret
-elif (( askbool )); then
+elif [[ $askbool -gt 0 ]]; then
 	print -p CONFIRM
   askbool_interpret
 else
